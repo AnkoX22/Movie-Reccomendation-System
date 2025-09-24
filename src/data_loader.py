@@ -6,7 +6,7 @@ def load_data():
     """Load the 100k ratings data from the files in data/raw"""
 
     # Load ratings
-    ratings = pd.read_csv('../data/raw/u.data', names=['userId', 'itemId', 'rating', 'timestamp'], sep='\t')
+    ratings = pd.read_csv('../data/raw/u.data', names=['userId', 'movieId', 'rating', 'timestamp'], sep='\t')
 
     # Load movies data
     movies = pd.read_csv('../data/raw/u.item', names=['movieId', 'title', 'releaseDate', 'videoReleaseDate',
@@ -17,15 +17,23 @@ def load_data():
                          sep='|', encoding='latin-1')
 
     # Load users
-    users = pd.read_csv('../data/raw/u.user', names=['userId', 'age', 'gender', 'occupation', 'zipcode'], sep='\t')
+    users = pd.read_csv('../data/raw/u.user', names=['userId', 'age', 'gender', 'occupation', 'zipcode'], sep='|')
 
     # Load genres
-    genres = pd.read_csv('../data/raw/u.genre', names=['genre'], sep='\t')
+    genres = pd.read_csv('../data/raw/u.genre', names=['genre'], sep='|')
 
     # Load occupations
-    occupations = pd.read_csv('../data/raw/u.occupation', names=['occupation'], sep='\t')
+    occupations = pd.read_csv('../data/raw/u.occupation', names=['occupation'])
 
     return ratings, movies, users, genres, occupations
+
+def create_movie_ratings_array(ratings, movies):
+    """Create the movie rating array"""
+    return ratings.merge(movies, on='movieId')
+
+def create_user_ratings_array(ratings, users):
+    """Create the user rating array"""
+    return ratings.merge(users, on='userId')
 
 
 if __name__ == "__main__":
@@ -39,5 +47,12 @@ if __name__ == "__main__":
 
     print("\nRatings columns:", ratings.columns.tolist())
     print("Movies columns:", movies.columns.tolist())
+
+    print(f"First few movies {movies[:50]}")
+
     print("\nFirst few ratings:")
     print(ratings.head())
+
+    print(f"Movies Ratings {create_movie_ratings_array(ratings, movies).head()}")
+
+    print(f"Users Ratings {create_user_ratings_array(ratings, users).head()}")
