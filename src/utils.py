@@ -2,21 +2,21 @@ import numpy as np
 import pandas as pd
 import data_loader
 
-def np_cosine_similarity(X, Y):
-    return np.dot(X, Y) / (np.linalg.norm(X) * np.linalg.norm(Y))
+def np_cosine_similarity(x, y):
+    return np.dot(x, y) / (np.linalg.norm(x) * np.linalg.norm(y))
 
-def manual_cosine_similarity(X, Y):
-    if len(X) != len(Y):
+def manual_cosine_similarity(x, y):
+    if len(x) != len(y):
         raise ValueError("Vectors must be the same length")
 
     dot_product = 0
     x_squared = 0
     y_squared = 0
 
-    for i in range(len(X)):
-        dot_product += X[i] * Y[i]
-        x_squared += X[i] * X[i]
-        y_squared += Y[i] * Y[i]
+    for i in range(len(x)):
+        dot_product += x[i] * y[i]
+        x_squared += x[i] * x[i]
+        y_squared += y[i] * y[i]
 
     denominator = np.sqrt(x_squared * y_squared)
 
@@ -25,43 +25,135 @@ def manual_cosine_similarity(X, Y):
 
     return dot_product / denominator
 
-def np_pearson_correlation(X, Y):
-    X_cebtered = X - X.mean()
-    Y_cebtered = Y - Y.mean()
+def np_pearson_correlation(x, y):
+    x_centered = x - x.mean()
+    y_centered = x - y.mean()
 
-    numerator = np.sum(X_cebtered * Y_cebtered)
-    denominator = np.sqrt(np.sum(X_cebtered**2))*np.sqrt(np.sum(Y_cebtered**2))
+    numerator = np.sum(x_centered * y_centered)
+    denominator = np.sqrt(np.sum(x_centered**2))*np.sqrt(np.sum(y_centered**2))
 
     if denominator == 0:
         return 0
-    return numerator / denominator
+    return numerator/denominator
 
-def manual_pearson_correlation(X, Y):
+def manual_pearson_correlation(x, y):
 
-    X = np.array(X)
-    Y = np.array(Y)
+    x = np.array(x)
+    y = np.array(y)
 
-    if(len(X) != len(Y)):
+    if len(x) != len(y):
         raise ValueError("Vectors must be the same length")
 
-    if len(X) == 0:
+    if len(x) == 0:
         return 0
 
-    X_total = 0
-    Y_total = 0
+    x_total = 0
+    y_total = 0
 
-    for i in range(len(X)):
-        X_total += X[i]
-        Y_total += Y[i]
+    for i in range(len(x)):
+        x_total += x[i]
+        y_total += y[i]
 
-    X_average = X_total / len(X)
-    Y_average = Y_total / len(Y)
+    x_average = x_total / len(x)
+    y_average = y_total / len(y)
 
-    X_centered = X - X_average
-    Y_centered = Y - Y_average
+    x_centered = x - x_average
+    y_centered = y - y_average
 
-    numerator = np.sum(X_centered * Y_centered)
-    denominator = np.sqrt(np.sum(X_centered**2))*np.sqrt(np.sum(Y_centered**2))
+    numerator = np.sum(x_centered * y_centered)
+    denominator = np.sqrt(np.sum(x_centered**2))*np.sqrt(np.sum(y_centered**2))
 
     return numerator / denominator
 
+def center_array(x):
+    """Scale the array"""
+
+    x_mean = np.mean(x)
+    if x_mean == 0:
+        return x
+
+    return x - x_mean
+
+def root_mean_squared_error(y_true, y_pred):
+    """Root Mean Squared Error"""
+    return np.sqrt(np.mean((y_true - y_pred)**2))
+
+def mean_absolute_error(y_true, y_pred):
+    """Mean Absolute Error"""
+    return np.mean(np.abs(y_true - y_pred))
+
+def user_based_cf_merge_movies(user_id, array):
+    """
+    Calculate the users similarity according to cosine similarity & pearson correlation
+    using only the movies that both of the users have rated
+    """
+
+    user_ratings = array[ array['userId'] == user_id]
+    cosine_similarity = []
+    pearson_correlation = []
+
+
+    for other_id in array['userId'].unique():
+        if other_id == user_id:
+            continue
+
+
+        other_user_rating = array[array['userId'] == other_id]
+        common = pd.merge(user_ratings, other_user_rating, on='movieId', suffixes=('_u1', '_u2'))
+
+        if len(common) == 0:
+            continue
+
+        v1 = common['rating_u1'].values
+        v2 = common['rating_u2'].values
+        cosine_similarity.append([int(other_id), float(np_cosine_similarity(v1, v2))])
+        pearson_correlation.append([int(other_id), float(np_pearson_correlation(v1, v2))])
+
+    return pd.DataFrame(cosine_similarity, columns=['userId', 'cosine']).sort_values('userId').reset_index(drop=True), pd.DataFrame(pearson_correlation, columns=['userId', 'pearson']).sort_values('userId').reset_index(drop=True)
+
+
+def user_based_cf_union_movies(user_id, ratings_matrix):
+    """
+    Compute cosine & Pearson similarity between one user
+    and all others based on the user–item rating matrix.
+    """
+    target_ratings = ratings_matrix.loc[user_id].values
+    cosine_similarities = []
+    pearson_correlations = []
+
+    for other_id in ratings_matrix.index:
+        if other_id == user_id:
+            continue  # skip self
+
+        other_ratings = ratings_matrix.loc[other_id].values
+
+        cos_sim = np_cosine_similarity(target_ratings, other_ratings)
+        pear_corr = np_pearson_correlation(target_ratings, other_ratings)
+
+        cosine_similarities.append([other_id, float(cos_sim)])
+        pearson_correlations.append([other_id, float(pear_corr)])
+
+    return pd.DataFrame(cosine_similarities, columns=['userId', 'cosine']).sort_values('userId').reset_index(drop=True), pd.DataFrame(pearson_correlations, columns=['userId', 'pearson']).sort_values('userId').reset_index(drop=True)
+
+
+
+
+if __name__ == "__main__":
+    ratings, movies, users, genres, occupation = data_loader.load_data()
+    user_based_array = ratings[['userId', 'movieId', 'rating']]
+    print(f"user_based_array: {user_based_array}")
+    print(users['userId'][0])
+
+
+    print(ratings[ ratings['userId'] == 1 ].reset_index(drop=True))
+
+    cosine_similarity, pearson_correlation = user_based_cf_merge_movies(1, user_based_array)
+    print(cosine_similarity)
+    print(pearson_correlation)
+
+    print("\n")
+    print("--------------------------------------------------------------------------------------------")
+    ratings_matrix = user_based_array.pivot(index='userId', columns='movieId', values='rating').fillna(0)
+    cosine_similarity2, pearson_correlation2 = user_based_cf_union_movies(1, ratings_matrix)
+    print(cosine_similarity2)
+    print(pearson_correlation2)

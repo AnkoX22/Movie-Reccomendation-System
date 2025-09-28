@@ -35,6 +35,10 @@ def create_user_ratings_array(ratings, users):
     """Create the user rating array"""
     return ratings.merge(users, on='userId')
 
+def create_user_based_cf_array(ratings):
+    """Create the user rating based cf array"""
+    return ratings[['userId', 'movieId', 'rating']]
+
 
 if __name__ == "__main__":
     # Test the functions
