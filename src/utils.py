@@ -135,8 +135,57 @@ def user_based_cf_union_movies(user_id, ratings_matrix):
 
     return pd.DataFrame(cosine_similarities, columns=['userId', 'cosine']).sort_values('userId').reset_index(drop=True), pd.DataFrame(pearson_correlations, columns=['userId', 'pearson']).sort_values('userId').reset_index(drop=True)
 
+def item_based_cf_merge_users(movie_id, array):
+    """
+    Compute the item ( movies ) similarity using cosine similarity
+    & pearson correlation
+    """
 
+    movie_ratings = array[ array['movieId'] == movie_id]
+    cosine_similarity = []
+    pearson_correlation = []
 
+    for other_id in array['movieId'].unique():
+        if other_id == movie_id:
+            continue
+
+        other_ratings = array[array['movieId'] == other_id]
+        common = pd.merge(movie_ratings, other_ratings, on='userId', suffixes=('_m1', '_m2'))
+
+        if len(common) == 0:
+            continue
+
+        m1 = common['rating_m1'].values
+        m2 = common['rating_m2'].values
+
+        cosine_similarity.append([int(other_id), float(np_cosine_similarity(m1, m2))])
+        pearson_correlation.append([int(other_id), float(np_pearson_correlation(m1, m2))])
+
+    return pd.DataFrame(cosine_similarity, columns=['movieId', 'cosine']).sort_values('movieId').reset_index(drop=True), pd.DataFrame(pearson_correlation, columns=['movieId', 'pearson']).sort_values('movieId').reset_index(drop=True)
+
+def item_based_cf_union_users(movie_id, array):
+    """
+    find the cosine similarity & pearson correlation between movies
+    this time with the union of ratings for the 2 movies being compared every time
+    """
+
+    target_rating = array.loc[movie_id].values
+    cosine_similarities = []
+    pearson_correlation = []
+
+    for other_id in array['movieId'].unique():
+
+        if other_id == movie_id:
+            continue
+
+        other_ratings = array.loc[other_id].values
+        cos_sim = np_cosine_similarity(target_rating, other_ratings)
+        pear_corr = np_pearson_correlation(other_ratings, target_rating)
+
+        cosine_similarities.append([other_id, float(cos_sim)])
+        pearson_correlation.append([other_id, float(pear_corr)])
+
+    return pd.DataFrame(cosine_similarities, columns=['movieId', 'cosine']).sort_values('movieId').reset_index(drop=True), pd.DataFrame(pearson_correlation, columns=['movieId', 'pearson']).sort_values('movieId').reset_index(drop=True)
 
 if __name__ == "__main__":
     ratings, movies, users, genres, occupation = data_loader.load_data()
@@ -147,13 +196,31 @@ if __name__ == "__main__":
 
     print(ratings[ ratings['userId'] == 1 ].reset_index(drop=True))
 
+    print("\n")
+    print("--------------------------------------------------------------------------------------------")
+    print("user_based_cf_union_movies(1, user_based_array)")
     cosine_similarity, pearson_correlation = user_based_cf_merge_movies(1, user_based_array)
     print(cosine_similarity)
     print(pearson_correlation)
 
     print("\n")
     print("--------------------------------------------------------------------------------------------")
+    print("user_based_cf_merge_movies(1, user_based_array)")
     ratings_matrix = user_based_array.pivot(index='userId', columns='movieId', values='rating').fillna(0)
     cosine_similarity2, pearson_correlation2 = user_based_cf_union_movies(1, ratings_matrix)
     print(cosine_similarity2)
     print(pearson_correlation2)
+
+    print("\n")
+    print("--------------------------------------------------------------------------------------------")
+    print("item_based_cf_union_movies(1, movie_based_array)")
+    cosine_similarity3, pearson_correlation3 = item_based_cf_union_users(1, user_based_array)
+    print(cosine_similarity3)
+    print(pearson_correlation3)
+
+    print("\n")
+    print("--------------------------------------------------------------------------------------------")
+    print("item_based_cf_merge_movies(1, movie_based_array)")
+    cosine_similarity4, pearson_correlation4 = item_based_cf_merge_users(1, user_based_array)
+    print(cosine_similarity4)
+    print(pearson_correlation4)
